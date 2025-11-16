@@ -56,9 +56,9 @@ def process_image(path: Path, max_size: int = 1024) -> tuple[str, int]:
             )
 
 
-def imtob64(fpath: Path) -> str:
-    image_base64, max_dim = process_image(fpath)
-    return image_base64
+def is_image(fpath: Path) -> bool:
+    s = fpath.suffix
+    return any([s == ".png", s == ".jpg", "s" == ".jpeg"])
 
 
 def image_to_url(fpath: Path) -> str:
@@ -70,10 +70,5 @@ def image_to_url(fpath: Path) -> str:
     else:
         raise ValueError(f"Expected an image, got: {suffix}")
 
-    bimage = imtob64(fpath)
+    bimage, _ = process_image(fpath)
     return f"data:image/{format};base64,{bimage}"
-
-
-def is_image(fpath: Path) -> bool:
-    s = fpath.suffix
-    return any([s == ".png", s == ".jpg", "s" == ".jpeg"])

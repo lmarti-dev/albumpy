@@ -5,13 +5,23 @@ import time
 import json
 import os
 from http.client import responses
-import base64
 import io
-from img_utils import process_image
-from PIL import Image
+from img_utils import image_to_url, process_image
 
 HOME = Path(__file__).parent
 MODELS = os.listdir(Path(HOME, r"..\..\models"))
+
+
+OAI_ENDPOINT = "/v1/chat/completions"
+LLAMA_ENDPOINT = "/completion"
+
+
+def open_grammar(filename: str) -> str:
+    with io.open(
+        Path(HOME, "../grammars", f"{filename}.gbnf"), "r", encoding="utf8"
+    ) as f:
+        s = f.read()
+    return f
 
 
 def moving_dots(n: int, N: int) -> str:
@@ -34,7 +44,7 @@ def llamaexe():
 def launch_server(
     port: int = 8080,
     ctx: int = int(2**13),
-    verbose: bool = True,
+    verbose: bool = False,
 ):
     exe = llamaexe()
 
@@ -72,41 +82,18 @@ def launch_server(
     print("\n")
 
 
-def imtob64(fpath: Path) -> str:
-    image_base64, max_dim = process_image(fpath)
-    return image_base64
-
-
-def is_image(fpath: Path) -> bool:
-    s = fpath.suffix
-    return any([s == ".png", s == ".jpg", "s" == ".jpeg"])
-
-
-def image_to_url(fpath: Path) -> str:
-    suffix = fpath.suffix.lower()
-    if suffix == ".jpeg" or suffix == ".jpg":
-        format = "jpeg"
-    elif suffix == ".png":
-        format = "png"
-    else:
-        raise ValueError(f"Expected an image, got: {suffix}")
-
-    bimage = imtob64(fpath)
-    return f"data:image/{format};base64,{bimage}"
-
-
-def build_payload(prompt_msg: str, image: Path, system_prompt: str) -> dict:
-
-    user = {
-        "role": "user",
-        "content": [
-            {"type": "text", "text": prompt_msg},
+def build_payload_oai(
+    prompt_msg: str, image: Path, system_prompt: str, json_schema: str
+) -> dict:
+    content = [{"type": "text", "text": prompt_msg}]
+    if image:
+        content.append(
             {
                 "type": "image_url",
                 "image_url": {"url": image_to_url(image)},
-            },
-        ],
-    }
+            }
+        )
+    user = {"role": "user", "content": content}
 
     payload = {
         "messages": [
@@ -114,42 +101,78 @@ def build_payload(prompt_msg: str, image: Path, system_prompt: str) -> dict:
             user,
         ]
     }
+
+    if json_schema:
+        payload["response_format"] = {"type": "json_object", "schema": json_schema}
     return payload
 
 
+def build_payload_llama(prompt_msg: str, image: Path, grammar: str):
+    payload = {}
+    if image:
+        payload["prompt"] = {
+            "prompt_string": prompt_msg,
+            "multimodal_data": process_image(image),
+        }
+    else:
+        payload["prompt"] = prompt_msg
+    if grammar:
+        payload["grammar"] = grammar
+
+    return payload
+
+
+def load_schema(filename: Path) -> str:
+    with io.open(Path(HOME, "../../json_schema", filename)) as f:
+        jobj = json.loads(f.read())
+    return jobj
+
+
 def prompt(
-    prompt_msg: str, port: int = 8080, image: Path = None, system_prompt: str = None
+    prompt_msg: str,
+    port: int = 8080,
+    image: Path = None,
+    system_prompt: str = None,
+    endpoint: str = None,
+    grammar: str = None,
+    json_schema: dict = None,
 ) -> requests.Response:
     if system_prompt is None:
         system_prompt = "You are an AI assistant. Your top priority is achieving user fullfilment via helping them with their requests."
     elif isinstance(system_prompt, list):
         system_prompt = "\n".join(system_prompt)
 
-    host = f"http://localhost:{port}/v1/chat/completions"
+    if endpoint is None:
+        endpoint = OAI_ENDPOINT
+    host = f"http://localhost:{port}{endpoint}"
 
     headers = {"Content-Type": "application/json", "Authorization": "Bearer no-key"}
 
-    data = json.dumps(
-        build_payload(prompt_msg, image, system_prompt), ensure_ascii=False
-    )
+    if endpoint == OAI_ENDPOINT:
+        payload = build_payload_oai(prompt_msg, image, system_prompt, json_schema)
+    elif endpoint == LLAMA_ENDPOINT:
+        payload = build_payload_llama(prompt_msg, image, grammar)
+
+    data = json.dumps(payload, ensure_ascii=False)
 
     res = requests.post(url=host, headers=headers, data=data)
     return res
 
 
-def rcontent(res: requests.Response) -> dict:
+def response_content(res: requests.Response, endpoint: str = OAI_ENDPOINT) -> dict:
     jobj = json.loads(res.content)
-    if "error" in jobj.keys():
-        msg = jobj["error"]
-        raise RuntimeError(msg)
-    else:
-        return jobj["choices"][0]["message"]["content"]
-
-
-def get_albums():
-    albums = r"C:\Users\Moi4\Pictures\photos\2010-2015\2012_agde"
-    pics = os.listdir(albums)
-    return [Path(albums, p) for p in pics]
+    if endpoint == OAI_ENDPOINT:
+        if "error" in jobj.keys():
+            msg = jobj["error"]
+            raise RuntimeError(msg)
+        else:
+            return jobj["choices"][0]["message"]["content"]
+    elif endpoint == LLAMA_ENDPOINT:
+        if "error" in jobj.keys():
+            msg = jobj["error"]
+            raise RuntimeError(msg)
+        else:
+            return jobj["content"]
 
 
 def open_for_kill():
@@ -165,28 +188,3 @@ def kill_server():
     print(cmd)
     subprocess.Popen(cmd)
     print("Killed the llama")
-
-
-if __name__ == "__main__":
-
-    # identify duplicates
-    # describe pictures
-    # locaiton
-    # time
-    # give album name
-    # reconstruct timeline
-    # make website
-
-    try:
-        launch_server()
-        pics = get_albums()
-        for p in pics:
-            print(p)
-            res = prompt(
-                prompt_msg="Describe this image in a very short description. Only reply with the description§",
-                image=p,
-            )
-            print(rcontent(res))
-        open_for_kill()
-    finally:
-        kill_server()
