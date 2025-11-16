@@ -45,6 +45,7 @@ def launch_server(
     port: int = 8080,
     ctx: int = int(2**13),
     verbose: bool = False,
+    which: str = "smolvlm",
 ):
     exe = llamaexe()
 
@@ -53,13 +54,17 @@ def launch_server(
     else:
         kwargs = {"stderr": subprocess.DEVNULL, "stdout": subprocess.DEVNULL}
 
-    gemma = True
-    if gemma:
+    if which == "gemma":
         model_name = "gemma-3-4b-it-Q8_0.gguf"
         mmproj = f"--mmproj {model_fpath('mmproj-model-f16.gguf')}"
-    else:
+    elif which == "llava":
         model_name = "llava-v1.5-7b-Q4_K_M.gguf"
         mmproj = ""
+    elif which == "smolvlm":
+        model_name = "SmolVLM-Instruct-Q8_0.gguf"
+        mmproj = ""
+    else:
+        raise ValueError(f"Invalid which: {which}")
     model = model_fpath(model_name)
     cmd = f"{exe} -m {model} --port {port} --offline -c {ctx} {mmproj} -ngl 99"
 

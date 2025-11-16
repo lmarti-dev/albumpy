@@ -5,6 +5,9 @@ import base64
 import io
 from pathlib import Path
 
+# this is mostly from
+# https://community.openai.com/t/how-to-load-a-local-image-to-gpt4-vision-using-api/533090
+
 
 def resize_image(image, max_dimension):
     width, height = image.size
