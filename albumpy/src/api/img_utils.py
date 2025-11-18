@@ -61,7 +61,7 @@ def process_image(path: Path, max_size: int = 1024) -> tuple[str, int]:
 
 def is_image(fpath: Path) -> bool:
     s = fpath.suffix
-    return any([s == ".png", s == ".jpg", "s" == ".jpeg"])
+    return any([s == ".png", s == ".jpg", s == ".jpeg"])
 
 
 def image_to_url(fpath: Path) -> str:

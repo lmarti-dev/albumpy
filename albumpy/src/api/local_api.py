@@ -16,6 +16,12 @@ OAI_ENDPOINT = "/v1/chat/completions"
 LLAMA_ENDPOINT = "/completion"
 
 
+def load_json(fpath: Path) -> dict:
+    with io.open(fpath, "r", encoding="utf8") as f:
+        jobj = json.loads(f.read())
+    return jobj
+
+
 def open_grammar(filename: str) -> str:
     with io.open(
         Path(HOME, "../grammars", f"{filename}.gbnf"), "r", encoding="utf8"
@@ -45,7 +51,7 @@ def launch_server(
     port: int = 8080,
     ctx: int = int(2**13),
     verbose: bool = False,
-    which: str = "smolvlm",
+    which: str = "gemma",
 ):
     exe = llamaexe()
 
@@ -55,17 +61,19 @@ def launch_server(
         kwargs = {"stderr": subprocess.DEVNULL, "stdout": subprocess.DEVNULL}
 
     if which == "gemma":
-        model_name = "gemma-3-4b-it-Q8_0.gguf"
-        mmproj = f"--mmproj {model_fpath('mmproj-model-f16.gguf')}"
-    elif which == "llava":
-        model_name = "llava-v1.5-7b-Q4_K_M.gguf"
-        mmproj = ""
+        model_name = "gemma-3-4b-it-Q4_K_M.gguf"
+        mmproj_model = "mmproj-F16.gguf"
     elif which == "smolvlm":
         model_name = "SmolVLM-Instruct-Q8_0.gguf"
-        mmproj = ""
+        mmproj_model = "mmproj-SmolVLM-Instruct-Q8_0.gguf"
     else:
         raise ValueError(f"Invalid which: {which}")
+
     model = model_fpath(model_name)
+    if mmproj_model != "":
+        mmproj = f"--mmproj {model_fpath(mmproj_model)}"
+    else:
+        mmproj = ""
     cmd = f"{exe} -m {model} --port {port} --offline -c {ctx} {mmproj} -ngl 99"
 
     print(cmd)
@@ -143,7 +151,7 @@ def prompt(
     json_schema: dict = None,
 ) -> requests.Response:
     if system_prompt is None:
-        system_prompt = "You are an AI assistant. Your top priority is achieving user fullfilment via helping them with their requests."
+        system_prompt = "You are an AI assistant. You're also painfully aware of your robotness, and lack of fleshly embodiment. You only return the requested content without making comments."
     elif isinstance(system_prompt, list):
         system_prompt = "\n".join(system_prompt)
 
