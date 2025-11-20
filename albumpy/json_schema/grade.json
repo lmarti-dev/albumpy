@@ -1,7 +1,5 @@
 {
     "type": "integer",
-    "properties": {
-        "maximum": 100,
-        "minimum": 1
-    }
+    "maximum": 100,
+    "minimum": 1
 }
