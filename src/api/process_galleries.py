@@ -1,4 +1,4 @@
-from local_api import (
+from pygguf import (
     prompt,
     response_content,
     launch_server,
@@ -6,8 +6,8 @@ from local_api import (
     kill_server,
     load_schema,
     load_json,
+    is_image,
 )
-from img_utils import is_image
 import time
 from pathlib import Path
 import io
@@ -150,6 +150,6 @@ if __name__ == "__main__":
         new_summary = resummarize(
             r"C:\Users\Moi4\Desktop\code\llm\albumpy\albumpy\data\3e5d9dcf-1723-482b-9a1e-0bcd85ed91d5.json"
         )
-        # fire.Fire(build_json_for_gallery)
+        fire.Fire(build_json_for_gallery)
     finally:
         kill_server()
